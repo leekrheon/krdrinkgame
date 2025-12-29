@@ -130,4 +130,3 @@ window.addEventListener("resize", () => {
 });
 
 animate();
-
