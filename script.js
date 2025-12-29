@@ -1,74 +1,94 @@
 const dice = document.getElementById("dice");
 const card = document.getElementById("card");
-const hint = document.getElementById("hint");
-const permissionBtn = document.getElementById("permissionBtn");
 
-let canShake = false;
-let isRolling = false;
+let posX = window.innerWidth / 2;
+let posY = window.innerHeight / 2;
+let velX = 0;
+let velY = 0;
 
-// iOS 센서 권한
-permissionBtn.addEventListener("click", async () => {
-  if (typeof DeviceMotionEvent.requestPermission === "function") {
-    try {
-      const res = await DeviceMotionEvent.requestPermission();
-      if (res === "granted") {
-        canShake = true;
-        permissionBtn.style.display = "none";
-        hint.textContent = "휴대폰을 흔들어 주세요";
-      }
-    } catch {
-      alert("센서 권한을 허용해주세요");
-    }
+const SPEED_MULTIPLIER = 3.0; // 흔들기 반응 속도
+const FRICTION = 0.985;      // 굴러가는 지속력
+const BOUNCE = 0.9;          // 벽 반발력
+
+let rolling = false;
+let rollTimeout = null;
+
+// iOS 권한 요청
+function requestMotionPermission() {
+  if (
+    typeof DeviceMotionEvent !== "undefined" &&
+    typeof DeviceMotionEvent.requestPermission === "function"
+  ) {
+    DeviceMotionEvent.requestPermission()
+      .then((response) => {
+        if (response === "granted") {
+          window.addEventListener("devicemotion", handleMotion);
+        }
+      })
+      .catch(console.error);
   } else {
-    canShake = true;
-    permissionBtn.style.display = "none";
+    window.addEventListener("devicemotion", handleMotion);
   }
-});
+}
 
-// 흔들기 감지
-window.addEventListener("devicemotion", (event) => {
-  if (!canShake || isRolling) return;
+document.body.addEventListener("click", requestMotionPermission, { once: true });
 
-  const acc = event.accelerationIncludingGravity;
-  if (!acc) return;
+function handleMotion(event) {
+  if (!event.accelerationIncludingGravity) return;
 
-  const power =
-    Math.abs(acc.x) + Math.abs(acc.y) + Math.abs(acc.z);
+  const ax = event.accelerationIncludingGravity.x || 0;
+  const ay = event.accelerationIncludingGravity.y || 0;
 
-  if (power > 25) {
-    rollDice();
+  velX += ax * SPEED_MULTIPLIER;
+  velY += ay * SPEED_MULTIPLIER;
+
+  if (!rolling) {
+    rolling = true;
+    startRollTimer();
   }
-});
+}
 
-function rollDice() {
-  isRolling = true;
-  hint.textContent = "주령구가 굴러갑니다…";
+function startRollTimer() {
+  if (rollTimeout) clearTimeout(rollTimeout);
 
-  card.classList.remove("show");
-
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-
-  const randomX = Math.random() * (vw - 200) + 100;
-  const randomY = Math.random() * (vh - 200) + 100;
-  const rotation = Math.random() * 1440 + 720;
-
-  dice.style.transform = `
-    translate(${randomX - vw / 2}px, ${randomY - vh / 2}px)
-    rotate(${rotation}deg)
-    scale(1.1)
-  `;
-
-  // 3초 후 카드 등장
-  setTimeout(() => {
-    dice.style.transform = `translate(-50%, -50%) scale(0.9)`;
-    card.classList.add("show");
-    hint.textContent = " ";
-
-    setTimeout(() => {
-      isRolling = false;
-    }, 800);
+  rollTimeout = setTimeout(() => {
+    dice.style.display = "none";
+    card.style.display = "flex";
+    rolling = false;
   }, 3000);
 }
 
+function animate() {
+  posX += velX;
+  posY += velY;
+
+  velX *= FRICTION;
+  velY *= FRICTION;
+
+  const diceRect = dice.getBoundingClientRect();
+  const size = diceRect.width;
+
+  if (posX < 0) {
+    posX = 0;
+    velX *= -BOUNCE;
+  }
+  if (posX > window.innerWidth - size) {
+    posX = window.innerWidth - size;
+    velX *= -BOUNCE;
+  }
+  if (posY < 0) {
+    posY = 0;
+    velY *= -BOUNCE;
+  }
+  if (posY > window.innerHeight - size) {
+    posY = window.innerHeight - size;
+    velY *= -BOUNCE;
+  }
+
+  dice.style.transform = `translate(${posX}px, ${posY}px) rotate(${posX + posY}deg)`;
+
+  requestAnimationFrame(animate);
+}
+
+animate();
 
