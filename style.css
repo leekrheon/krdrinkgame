@@ -1,9 +1,9 @@
 body {
   margin: 0;
   padding: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont;
   background: #111;
   color: #fff;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont;
   height: 100vh;
   display: flex;
   align-items: center;
@@ -15,20 +15,28 @@ body {
 }
 
 #dice {
-  font-size: 80px;
-  margin: 30px 0;
+  width: 140px;
+  height: 140px;
+  margin: 30px auto;
+  display: block;
   transition: transform 0.6s ease;
 }
 
-.rolling {
-  transform: rotate(720deg) scale(1.2);
+#dice.rolling {
+  transform: rotate(720deg) scale(1.15);
+}
+
+#result {
+  margin: 20px 0;
+  font-size: 18px;
 }
 
 button {
-  padding: 12px 18px;
+  padding: 12px 20px;
   font-size: 16px;
   border: none;
   border-radius: 8px;
   background: #fff;
   color: #000;
 }
+
