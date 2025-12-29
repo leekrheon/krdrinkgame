@@ -1,44 +1,25 @@
 const dice = document.getElementById("dice");
-const result = document.getElementById("result");
+const card = document.getElementById("card");
+const hint = document.getElementById("hint");
 const permissionBtn = document.getElementById("permissionBtn");
 
 let canShake = false;
 let isRolling = false;
 
-// 주령구 벌칙 14개
-const penalties = [
-  "자작삼배 – 혼자 3잔",
-  "중인음 – 모두 한 잔",
-  "일인음 – 한 사람만",
-  "벌주",
-  "급수진배 – 바로 원샷",
-  "재척 – 다시 던져라",
-  "물음 – 마시지 말라",
-  "좌인음 – 왼쪽 사람",
-  "우인음 – 오른쪽 사람",
-  "우인음 – 오른쪽 사람",
-  "주인음 – 주최자",
-  "대작 – 큰 잔으로",
-  "소작 – 작은 잔으로",
-  "가무 – 노래나 춤",
-  "자유 – 원하는 사람"
-];
-
-// iOS 센서 권한 요청
+// iOS 센서 권한
 permissionBtn.addEventListener("click", async () => {
   if (typeof DeviceMotionEvent.requestPermission === "function") {
     try {
-      const response = await DeviceMotionEvent.requestPermission();
-      if (response === "granted") {
+      const res = await DeviceMotionEvent.requestPermission();
+      if (res === "granted") {
         canShake = true;
         permissionBtn.style.display = "none";
-        result.textContent = "휴대폰을 흔들어 주세요";
+        hint.textContent = "휴대폰을 흔들어 주세요";
       }
-    } catch (e) {
+    } catch {
       alert("센서 권한을 허용해주세요");
     }
   } else {
-    // Android
     canShake = true;
     permissionBtn.style.display = "none";
   }
@@ -61,19 +42,33 @@ window.addEventListener("devicemotion", (event) => {
 
 function rollDice() {
   isRolling = true;
-  dice.classList.add("rolling");
-  result.textContent = "주령구가 굴러갑니다…";
+  hint.textContent = "주령구가 굴러갑니다…";
 
+  card.classList.remove("show");
+
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  const randomX = Math.random() * (vw - 200) + 100;
+  const randomY = Math.random() * (vh - 200) + 100;
+  const rotation = Math.random() * 1440 + 720;
+
+  dice.style.transform = `
+    translate(${randomX - vw / 2}px, ${randomY - vh / 2}px)
+    rotate(${rotation}deg)
+    scale(1.1)
+  `;
+
+  // 3초 후 카드 등장
   setTimeout(() => {
-    const pick =
-      penalties[Math.floor(Math.random() * penalties.length)];
-    result.textContent = pick;
-    dice.classList.remove("rolling");
+    dice.style.transform = `translate(-50%, -50%) scale(0.9)`;
+    card.classList.add("show");
+    hint.textContent = " ";
 
-    // 연속 흔들기 방지
     setTimeout(() => {
       isRolling = false;
-    }, 1000);
-  }, 800);
+    }, 800);
+  }, 3000);
 }
+
 
