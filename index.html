@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>주령구</title>
 
   <!-- Google Font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,20 +13,23 @@
 </head>
 <body>
 
-  <div id="app">
-    <!-- 주령구 -->
-    <img id="dice" src="dice.png" alt="주령구" />
+  <!-- 흔들기 권한 안내 -->
+  <div id="permission">
+    화면을 터치한 뒤<br>
+    휴대폰을 흔들어 주세요
+  </div>
 
-    <!-- 카드 -->
-    <img id="card" src="card.png" alt="벌칙 카드" />
+  <!-- 주령구 -->
+  <div id="dice">
+    <div class="dice-text">주령구</div>
+  </div>
 
-    <!-- 안내 -->
-    <p id="hint">휴대폰을 흔들어 주세요</p>
-
-    <!-- iOS 권한 -->
-    <button id="permissionBtn">흔들기 권한 허용</button>
+  <!-- 카드 -->
+  <div id="card">
+    <img src="card.png" alt="벌칙 카드">
   </div>
 
   <script src="script.js"></script>
 </body>
 </html>
+
