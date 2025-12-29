@@ -1,94 +1,133 @@
 const dice = document.getElementById("dice");
 const card = document.getElementById("card");
+const permission = document.getElementById("permission");
 
-let posX = window.innerWidth / 2;
-let posY = window.innerHeight / 2;
-let velX = 0;
-let velY = 0;
+/* 화면 크기 */
+let W = window.innerWidth;
+let H = window.innerHeight;
 
-const SPEED_MULTIPLIER = 3.0; // 흔들기 반응 속도
-const FRICTION = 0.985;      // 굴러가는 지속력
-const BOUNCE = 0.9;          // 벽 반발력
+/* 주사위 크기 */
+const SIZE = 120;
+
+/* 위치: 처음엔 바닥에 떨어져 있음 */
+let x = (W - SIZE) / 2;
+let y = H - SIZE;
+
+/* 속도 */
+let vx = 0;
+let vy = 0;
+
+/* 물리 상수 */
+const GRAVITY = 0.6;        // 아래로 끌어당기는 중력
+const FRICTION = 0.99;      // 공기 저항
+const BOUNCE = 0.85;        // 벽/바닥 반발력
+const SHAKE_POWER = 1.8;    // 흔들기 세기 반영 비율
+const THRESHOLD = 1.2;      // 약한 흔들림 무시
 
 let rolling = false;
-let rollTimeout = null;
+let rollTimer = null;
 
-// iOS 권한 요청
-function requestMotionPermission() {
+/* iOS 권한 */
+function requestPermission() {
   if (
     typeof DeviceMotionEvent !== "undefined" &&
     typeof DeviceMotionEvent.requestPermission === "function"
   ) {
-    DeviceMotionEvent.requestPermission()
-      .then((response) => {
-        if (response === "granted") {
-          window.addEventListener("devicemotion", handleMotion);
-        }
-      })
-      .catch(console.error);
+    DeviceMotionEvent.requestPermission().then((res) => {
+      if (res === "granted") {
+        permission.style.display = "none";
+        window.addEventListener("devicemotion", onMotion);
+      }
+    });
   } else {
-    window.addEventListener("devicemotion", handleMotion);
+    permission.style.display = "none";
+    window.addEventListener("devicemotion", onMotion);
   }
 }
 
-document.body.addEventListener("click", requestMotionPermission, { once: true });
+document.body.addEventListener("click", requestPermission, { once: true });
 
-function handleMotion(event) {
-  if (!event.accelerationIncludingGravity) return;
+/* 흔들기 처리 */
+function onMotion(e) {
+  if (!e.acceleration) return;
 
-  const ax = event.accelerationIncludingGravity.x || 0;
-  const ay = event.accelerationIncludingGravity.y || 0;
+  const ax = e.acceleration.x || 0;
+  const ay = e.acceleration.y || 0;
 
-  velX += ax * SPEED_MULTIPLIER;
-  velY += ay * SPEED_MULTIPLIER;
+  const power = Math.abs(ax) + Math.abs(ay);
+  if (power < THRESHOLD) return;
+
+  /* 실제 흔든 방향 그대로 속도에 반영 */
+  vx += ax * SHAKE_POWER;
+  vy -= ay * SHAKE_POWER;
 
   if (!rolling) {
     rolling = true;
-    startRollTimer();
+    startRollEnd();
   }
 }
 
-function startRollTimer() {
-  if (rollTimeout) clearTimeout(rollTimeout);
-
-  rollTimeout = setTimeout(() => {
+/* 3초 후 카드 표시 */
+function startRollEnd() {
+  clearTimeout(rollTimer);
+  rollTimer = setTimeout(() => {
     dice.style.display = "none";
     card.style.display = "flex";
     rolling = false;
   }, 3000);
 }
 
+/* 애니메이션 루프 */
 function animate() {
-  posX += velX;
-  posY += velY;
+  /* 중력 */
+  vy += GRAVITY;
 
-  velX *= FRICTION;
-  velY *= FRICTION;
+  /* 이동 */
+  x += vx;
+  y += vy;
 
-  const diceRect = dice.getBoundingClientRect();
-  const size = diceRect.width;
+  /* 마찰 */
+  vx *= FRICTION;
+  vy *= FRICTION;
 
-  if (posX < 0) {
-    posX = 0;
-    velX *= -BOUNCE;
+  /* 좌우 벽 */
+  if (x < 0) {
+    x = 0;
+    vx *= -BOUNCE;
   }
-  if (posX > window.innerWidth - size) {
-    posX = window.innerWidth - size;
-    velX *= -BOUNCE;
-  }
-  if (posY < 0) {
-    posY = 0;
-    velY *= -BOUNCE;
-  }
-  if (posY > window.innerHeight - size) {
-    posY = window.innerHeight - size;
-    velY *= -BOUNCE;
+  if (x > W - SIZE) {
+    x = W - SIZE;
+    vx *= -BOUNCE;
   }
 
-  dice.style.transform = `translate(${posX}px, ${posY}px) rotate(${posX + posY}deg)`;
+  /* 천장 */
+  if (y < 0) {
+    y = 0;
+    vy *= -BOUNCE;
+  }
+
+  /* 바닥 */
+  if (y > H - SIZE) {
+    y = H - SIZE;
+    vy *= -BOUNCE;
+
+    /* 바닥에 닿으면 조금 더 감쇠 */
+    vx *= 0.95;
+  }
+
+  dice.style.transform = `
+    translate(${x}px, ${y}px)
+    rotate(${(vx + vy) * 4}deg)
+  `;
 
   requestAnimationFrame(animate);
 }
+
+/* 리사이즈 대응 */
+window.addEventListener("resize", () => {
+  W = window.innerWidth;
+  H = window.innerHeight;
+});
 
 animate();
 
