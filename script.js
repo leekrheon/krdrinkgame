@@ -16,6 +16,7 @@ const penalties = [
   "물음 – 마시지 말라",
   "좌인음 – 왼쪽 사람",
   "우인음 – 오른쪽 사람",
+  "우인음 – 오른쪽 사람",
   "주인음 – 주최자",
   "대작 – 큰 잔으로",
   "소작 – 작은 잔으로",
@@ -23,7 +24,7 @@ const penalties = [
   "자유 – 원하는 사람"
 ];
 
-// iOS 권한 요청
+// iOS 센서 권한 요청
 permissionBtn.addEventListener("click", async () => {
   if (typeof DeviceMotionEvent.requestPermission === "function") {
     try {
@@ -34,10 +35,10 @@ permissionBtn.addEventListener("click", async () => {
         result.textContent = "휴대폰을 흔들어 주세요";
       }
     } catch (e) {
-      alert("권한 요청 실패");
+      alert("센서 권한을 허용해주세요");
     }
   } else {
-    // 안드로이드 등
+    // Android
     canShake = true;
     permissionBtn.style.display = "none";
   }
@@ -61,7 +62,7 @@ window.addEventListener("devicemotion", (event) => {
 function rollDice() {
   isRolling = true;
   dice.classList.add("rolling");
-  result.textContent = "주령구 굴러가는 중…";
+  result.textContent = "주령구가 굴러갑니다…";
 
   setTimeout(() => {
     const pick =
@@ -69,9 +70,10 @@ function rollDice() {
     result.textContent = pick;
     dice.classList.remove("rolling");
 
-    // 쿨타임
+    // 연속 흔들기 방지
     setTimeout(() => {
       isRolling = false;
     }, 1000);
   }, 800);
 }
+
