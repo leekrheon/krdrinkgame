@@ -1,157 +1,176 @@
-/* ======================
-   CARD CONFIG
-====================== */
-
-const CARD_IMAGES = Array.from({ length: 14 }, (_, i) => `cards/card${i + 1}.jpg`);
-const CARD_WEIGHTS = Array(14).fill(1 / 14);
-
-
-/* ======================
-   ELEMENTS
-====================== */
-
-const startScreen = document.getElementById("start-screen");
 const dice = document.getElementById("dice");
 const card = document.getElementById("card");
-const cardImg = document.getElementById("card-img");
+const cardImg = card.querySelector("img");
+const permission = document.getElementById("permission");
 
+/* ================= 카드 개별 설정 ================= */
+/* 여기서 14개 전부 직접 지정 가능 */
+const cards = [
+  { src: "card1.png", weight: 1 },
+  { src: "card2.png", weight: 1 },
+  { src: "card3.png", weight: 1 },
+  { src: "card4.png", weight: 1 },
+  { src: "card5.png", weight: 1 },
+  { src: "card6.png", weight: 1 },
+  { src: "card7.png", weight: 1 },
+  { src: "card8.png", weight: 1 },
+  { src: "card9.png", weight: 1 },
+  { src: "card10.png", weight: 1 },
+  { src: "card11.png", weight: 1 },
+  { src: "card12.png", weight: 1 },
+  { src: "card13.png", weight: 1 },
+  { src: "card14.png", weight: 1 }
+];
 
-/* ======================
-   STATE
-====================== */
+/* ================= 화면 ================= */
+let W = window.innerWidth;
+let H = window.innerHeight;
+const SIZE = 120;
 
-let permissionGranted = false;
-let rolling = false;
-
-let x = window.innerWidth / 2;
-let y = window.innerHeight - 160;
+/* ================= 상태 ================= */
+let x = (W - SIZE) / 2;
+let y = H - SIZE;
 let vx = 0;
 let vy = 0;
 
-let rotation = 0;
-let rotationAccum = 0;
-let rollStart = 0;
+/* ================= 센서 상태 ================= */
+let beta = 0;
+let gamma = 0;
+let filtAX = 0;
+let filtAY = 0;
 
+/* ================= 물리 상수 ================= */
+const GRAVITY_STRENGTH = 1.2;
+const TILT_GAIN = 0.035;
+const MOVE_GAIN = 1.8;
+const FRICTION = 0.985;
+const BOUNCE = 0.85;
+const LPF = 0.9;
+const MOVE_THRESHOLD = 0.08;
 
-/* ======================
-   PERMISSION (🔥 핵심)
-====================== */
+/* ================= 굴림 상태 ================= */
+let rolling = false;
+let rollTimer = null;
+const ROLL_DURATION = 4000; // ⭐ 4초
 
-startScreen.addEventListener("click", async () => {
-  try {
-    if (
-      typeof DeviceMotionEvent !== "undefined" &&
-      typeof DeviceMotionEvent.requestPermission === "function"
-    ) {
-      await DeviceMotionEvent.requestPermission();
-      await DeviceOrientationEvent.requestPermission();
-    }
-
-    permissionGranted = true;
-    startScreen.style.display = "none";
-
-  } catch {
-    alert("모션 권한을 허용해야 합니다.");
+/* ================= 권한 ================= */
+function requestPermission() {
+  if (
+    typeof DeviceMotionEvent !== "undefined" &&
+    typeof DeviceMotionEvent.requestPermission === "function"
+  ) {
+    DeviceMotionEvent.requestPermission().then(res => {
+      if (res === "granted") startSensors();
+    });
+  } else {
+    startSensors();
   }
-}, { once: true });
+}
 
+document.body.addEventListener("click", requestPermission, { once: true });
 
-/* ======================
-   SENSOR INPUT
-====================== */
+function startSensors() {
+  permission.style.display = "none";
+  window.addEventListener("deviceorientation", onOrientation, true);
+  window.addEventListener("devicemotion", onMotion, true);
+}
 
-window.addEventListener("deviceorientation", e => {
-  if (!rolling) return;
+/* ================= 기울기 ================= */
+function onOrientation(e) {
+  beta = (e.beta || 0) * Math.PI / 180;
+  gamma = (e.gamma || 0) * Math.PI / 180;
+}
 
-  vx += (e.gamma || 0) * 0.05;
-  vy += (e.beta || 0) * 0.05;
+/* ================= 실제 이동 ================= */
+function onMotion(e) {
+  if (!e.acceleration) return;
+
+  const ax = e.acceleration.x || 0;
+  const ay = e.acceleration.y || 0;
+
+  filtAX = filtAX * LPF + ax * (1 - LPF);
+  filtAY = filtAY * LPF + ay * (1 - LPF);
+
+  if (Math.abs(filtAX) > MOVE_THRESHOLD) vx += filtAX * MOVE_GAIN;
+  if (Math.abs(filtAY) > MOVE_THRESHOLD) vy -= filtAY * MOVE_GAIN;
+
+  triggerRoll();
+}
+
+/* ================= 굴림 시작 ================= */
+function triggerRoll() {
+  if (rolling) return;
+  rolling = true;
+
+  clearTimeout(rollTimer);
+  rollTimer = setTimeout(showRandomCard, ROLL_DURATION);
+}
+
+/* ================= 카드 랜덤 (가중치) ================= */
+function pickCard() {
+  const totalWeight = cards.reduce((sum, c) => sum + c.weight, 0);
+  let r = Math.random() * totalWeight;
+
+  for (const c of cards) {
+    r -= c.weight;
+    if (r <= 0) return c.src;
+  }
+}
+
+/* ================= 카드 표시 ================= */
+function showRandomCard() {
+  dice.style.display = "none";
+  cardImg.src = pickCard();
+  card.style.display = "flex";
+}
+
+/* ================= 카드 클릭 → 리셋 ================= */
+card.addEventListener("click", () => {
+  card.style.display = "none";
+  dice.style.display = "block";
+
+  x = (W - SIZE) / 2;
+  y = H - SIZE;
+  vx = 0;
+  vy = 0;
+  rolling = false;
 });
 
-window.addEventListener("devicemotion", e => {
-  if (!rolling) return;
+/* ================= 애니메이션 ================= */
+function animate() {
+  const gx = Math.sin(gamma) * GRAVITY_STRENGTH;
+  const gy = Math.sin(beta) * GRAVITY_STRENGTH;
 
-  const a = e.accelerationIncludingGravity;
-  if (!a) return;
-
-  vx += a.x * 2.5;
-  vy -= a.y * 2.5;
-
-  rotationAccum += (Math.abs(a.x) + Math.abs(a.y)) * 6;
-});
-
-
-/* ======================
-   PHYSICS LOOP
-====================== */
-
-function update() {
-  if (!rolling) return;
-
-  vy += 0.9;
+  vx += gx * TILT_GAIN;
+  vy += gy * TILT_GAIN;
 
   x += vx;
   y += vy;
 
-  vx *= 0.985;
-  vy *= 0.985;
+  vx *= FRICTION;
+  vy *= FRICTION;
 
-  rotation += Math.abs(vx) + Math.abs(vy);
+  if (x < 0) { x = 0; vx *= -BOUNCE; }
+  if (x > W - SIZE) { x = W - SIZE; vx *= -BOUNCE; }
 
-  const size = dice.offsetWidth;
-  const maxX = window.innerWidth - size;
-  const maxY = window.innerHeight - size;
-
-  if (x < 0 || x > maxX) vx *= -0.8;
-  if (y < 0 || y > maxY) vy *= -0.8;
-
-  x = Math.max(0, Math.min(x, maxX));
-  y = Math.max(0, Math.min(y, maxY));
-
-  dice.style.transform = `translate(${x}px, ${y}px) rotate(${rotation}deg)`;
-
-  if (performance.now() - rollStart >= 4000) {
-    rolling = false;
-    if (rotationAccum >= 540) showCard();
-    return;
+  if (y < 0) { y = 0; vy *= -BOUNCE; }
+  if (y > H - SIZE) {
+    y = H - SIZE;
+    vy *= -BOUNCE;
+    vx *= 0.96;
   }
 
-  requestAnimationFrame(update);
+  dice.style.transform = `
+    translate(${x}px, ${y}px)
+    rotate(${(vx + vy) * 3}deg)
+  `;
+
+  requestAnimationFrame(animate);
 }
 
-
-/* ======================
-   ROLL
-====================== */
-
-dice.addEventListener("click", () => {
-  if (!permissionGranted || rolling) return;
-
-  rolling = true;
-  rotationAccum = 0;
-  rollStart = performance.now();
-
-  requestAnimationFrame(update);
+window.addEventListener("resize", () => {
+  W = window.innerWidth;
+  H = window.innerHeight;
 });
 
-
-/* ======================
-   CARD
-====================== */
-
-function weightedRandom() {
-  let r = Math.random(), sum = 0;
-  for (let i = 0; i < CARD_WEIGHTS.length; i++) {
-    sum += CARD_WEIGHTS[i];
-    if (r <= sum) return i;
-  }
-  return 0;
-}
-
-function showCard() {
-  cardImg.src = CARD_IMAGES[weightedRandom()];
-  card.classList.add("show");
-}
-
-card.addEventListener("click", () => {
-  card.classList.remove("show");
-});
+animate();
