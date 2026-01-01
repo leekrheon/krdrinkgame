@@ -1,132 +1,195 @@
+/* ===============================
+   CONFIG
+================================ */
+
+// 카드 이미지 개별 설정 (14개)
+const CARD_IMAGES = [
+  "cards/card1.jpg",
+  "cards/card2.jpg",
+  "cards/card3.jpg",
+  "cards/card4.jpg",
+  "cards/card5.jpg",
+  "cards/card6.jpg",
+  "cards/card7.jpg",
+  "cards/card8.jpg",
+  "cards/card9.jpg",
+  "cards/card10.jpg",
+  "cards/card11.jpg",
+  "cards/card12.jpg",
+  "cards/card13.jpg",
+  "cards/card14.jpg"
+];
+
+// 카드 등장 확률 (합 = 1)
+const CARD_WEIGHTS = Array(14).fill(1 / 14);
+
+// 굴림 시간
+const ROLL_DURATION = 4000;
+
+// 카드 등장 최소 누적 회전량
+const REQUIRED_ROTATION = 540; // 1.5바퀴 이상
+
+// 물리 계수
+const GRAVITY = 0.9;
+const FRICTION = 0.985;
+const SHAKE_MULTIPLIER = 2.8;
+
+
+/* ===============================
+   ELEMENTS
+================================ */
+
 const dice = document.getElementById("dice");
 const card = document.getElementById("card");
-const permission = document.getElementById("permission");
+const cardImg = document.getElementById("card-img");
 
-/* 화면 크기 */
-let W = window.innerWidth;
-let H = window.innerHeight;
-
-/* 주사위 크기 */
-const SIZE = 120;
-
-/* 위치: 처음엔 바닥에 떨어져 있음 */
-let x = (W - SIZE) / 2;
-let y = H - SIZE;
-
-/* 속도 */
+let x = window.innerWidth / 2;
+let y = window.innerHeight - 160;
 let vx = 0;
 let vy = 0;
 
-/* 물리 상수 */
-const GRAVITY = 0.6;        // 아래로 끌어당기는 중력
-const FRICTION = 0.99;      // 공기 저항
-const BOUNCE = 0.85;        // 벽/바닥 반발력
-const SHAKE_POWER = 1.8;    // 흔들기 세기 반영 비율
-const THRESHOLD = 1.2;      // 약한 흔들림 무시
+let rotation = 0;
+let rotationAccum = 0;
 
 let rolling = false;
-let rollTimer = null;
+let rollStartTime = 0;
 
-/* iOS 권한 */
-function requestPermission() {
-  if (
-    typeof DeviceMotionEvent !== "undefined" &&
-    typeof DeviceMotionEvent.requestPermission === "function"
-  ) {
-    DeviceMotionEvent.requestPermission().then((res) => {
-      if (res === "granted") {
-        permission.style.display = "none";
-        window.addEventListener("devicemotion", onMotion);
-      }
-    });
-  } else {
-    permission.style.display = "none";
-    window.addEventListener("devicemotion", onMotion);
-  }
+
+/* ===============================
+   PERMISSION
+================================ */
+
+if (
+  typeof DeviceMotionEvent !== "undefined" &&
+  typeof DeviceMotionEvent.requestPermission === "function"
+) {
+  document.body.addEventListener("click", async () => {
+    await DeviceMotionEvent.requestPermission();
+    await DeviceOrientationEvent.requestPermission();
+  }, { once: true });
 }
 
-document.body.addEventListener("click", requestPermission, { once: true });
 
-/* 흔들기 처리 */
-function onMotion(e) {
-  if (!e.acceleration) return;
+/* ===============================
+   SENSOR INPUT
+================================ */
 
-  const ax = e.acceleration.x || 0;
-  const ay = e.acceleration.y || 0;
+window.addEventListener("deviceorientation", (e) => {
+  if (!rolling) return;
 
-  const power = Math.abs(ax) + Math.abs(ay);
-  if (power < THRESHOLD) return;
+  const tiltX = e.gamma || 0;
+  const tiltY = e.beta || 0;
 
-  /* 실제 흔든 방향 그대로 속도에 반영 */
-  vx += ax * SHAKE_POWER;
-  vy -= ay * SHAKE_POWER;
+  vx += tiltX * 0.08;
+  vy += tiltY * 0.08;
+});
 
-  if (!rolling) {
-    rolling = true;
-    startRollEnd();
-  }
-}
+window.addEventListener("devicemotion", (e) => {
+  if (!rolling) return;
 
-/* 3초 후 카드 표시 */
-function startRollEnd() {
-  clearTimeout(rollTimer);
-  rollTimer = setTimeout(() => {
-    dice.style.display = "none";
-    card.style.display = "flex";
-    rolling = false;
-  }, 3000);
-}
+  const acc = e.accelerationIncludingGravity;
+  if (!acc) return;
 
-/* 애니메이션 루프 */
-function animate() {
-  /* 중력 */
+  const ax = acc.x || 0;
+  const ay = acc.y || 0;
+
+  vx += ax * SHAKE_MULTIPLIER;
+  vy -= ay * SHAKE_MULTIPLIER;
+
+  const spin = Math.abs(ax) + Math.abs(ay);
+  rotationAccum += spin * 6;
+});
+
+
+/* ===============================
+   PHYSICS LOOP
+================================ */
+
+function update() {
+  if (!rolling) return;
+
   vy += GRAVITY;
 
-  /* 이동 */
   x += vx;
   y += vy;
 
-  /* 마찰 */
   vx *= FRICTION;
   vy *= FRICTION;
 
-  /* 좌우 벽 */
-  if (x < 0) {
-    x = 0;
-    vx *= -BOUNCE;
-  }
-  if (x > W - SIZE) {
-    x = W - SIZE;
-    vx *= -BOUNCE;
-  }
+  rotation += Math.abs(vx) + Math.abs(vy);
 
-  /* 천장 */
-  if (y < 0) {
-    y = 0;
-    vy *= -BOUNCE;
-  }
+  const size = dice.offsetWidth;
+  const maxX = window.innerWidth - size;
+  const maxY = window.innerHeight - size;
 
-  /* 바닥 */
-  if (y > H - SIZE) {
-    y = H - SIZE;
-    vy *= -BOUNCE;
+  if (x < 0) { x = 0; vx *= -0.8; }
+  if (x > maxX) { x = maxX; vx *= -0.8; }
+  if (y < 0) { y = 0; vy *= -0.8; }
+  if (y > maxY) { y = maxY; vy *= -0.8; }
 
-    /* 바닥에 닿으면 조금 더 감쇠 */
-    vx *= 0.95;
+  dice.style.transform = `translate(${x}px, ${y}px) rotate(${rotation}deg)`;
+
+  if (performance.now() - rollStartTime >= ROLL_DURATION) {
+    finishRoll();
+    return;
   }
 
-  dice.style.transform = `
-    translate(${x}px, ${y}px)
-    rotate(${(vx + vy) * 4}deg)
-  `;
-
-  requestAnimationFrame(animate);
+  requestAnimationFrame(update);
 }
 
-/* 리사이즈 대응 */
-window.addEventListener("resize", () => {
-  W = window.innerWidth;
-  H = window.innerHeight;
+
+/* ===============================
+   ROLL CONTROL
+================================ */
+
+function startRoll() {
+  if (rolling) return;
+
+  rolling = true;
+  rotationAccum = 0;
+  rollStartTime = performance.now();
+
+  card.classList.remove("show");
+  requestAnimationFrame(update);
+}
+
+function finishRoll() {
+  rolling = false;
+
+  if (rotationAccum >= REQUIRED_ROTATION) {
+    showCard();
+  }
+}
+
+
+/* ===============================
+   CARD LOGIC
+================================ */
+
+function weightedRandom() {
+  const r = Math.random();
+  let sum = 0;
+
+  for (let i = 0; i < CARD_WEIGHTS.length; i++) {
+    sum += CARD_WEIGHTS[i];
+    if (r <= sum) return i;
+  }
+  return 0;
+}
+
+function showCard() {
+  const index = weightedRandom();
+  cardImg.src = CARD_IMAGES[index];
+  card.classList.add("show");
+}
+
+card.addEventListener("click", () => {
+  card.classList.remove("show");
 });
 
-animate();
+
+/* ===============================
+   START
+================================ */
+
+dice.addEventListener("click", startRoll);
