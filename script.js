@@ -52,8 +52,9 @@ let rolling = false;
 let rollTimer = null;
 let shakePower = 0;
 
-const ROLL_DURATION = 4000;        // 4초
-const REQUIRED_SHAKE_POWER = 120;  // ⭐ 이 값으로 난이도 조절
+const ROLL_DURATION = 4000;           // 4초
+const REQUIRED_SHAKE_POWER = 120;     // 카드 등장 기준
+const SHAKE_POWER_THRESHOLD = 0.6;    // ⭐ 미세 움직임 무시 기준
 
 /* ================= 권한 ================= */
 function requestPermission() {
@@ -96,8 +97,11 @@ function onMotion(e) {
   if (Math.abs(filtAX) > MOVE_THRESHOLD) vx += filtAX * MOVE_GAIN;
   if (Math.abs(filtAY) > MOVE_THRESHOLD) vy -= filtAY * MOVE_GAIN;
 
-  // ⭐ 흔든 세기 누적
-  shakePower += Math.abs(filtAX) + Math.abs(filtAY);
+  // ⭐ 의미 있는 흔들림만 누적
+  const power = Math.abs(filtAX) + Math.abs(filtAY);
+  if (power > SHAKE_POWER_THRESHOLD) {
+    shakePower += power;
+  }
 
   triggerRoll();
 }
@@ -105,6 +109,7 @@ function onMotion(e) {
 /* ================= 굴림 시작 ================= */
 function triggerRoll() {
   if (rolling) return;
+
   rolling = true;
   shakePower = 0;
 
