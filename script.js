@@ -4,7 +4,6 @@ const cardImg = card.querySelector("img");
 const permission = document.getElementById("permission");
 
 /* ================= 카드 개별 설정 ================= */
-/* 여기서 14개 전부 직접 지정 가능 */
 const cards = [
   { src: "card1.png", weight: 1 },
   { src: "card2.png", weight: 1 },
@@ -48,10 +47,13 @@ const BOUNCE = 0.85;
 const LPF = 0.9;
 const MOVE_THRESHOLD = 0.08;
 
-/* ================= 굴림 상태 ================= */
+/* ================= 굴림 조건 ================= */
 let rolling = false;
 let rollTimer = null;
-const ROLL_DURATION = 4000; // ⭐ 4초
+let shakePower = 0;
+
+const ROLL_DURATION = 4000;        // 4초
+const REQUIRED_SHAKE_POWER = 120;  // ⭐ 이 값으로 난이도 조절
 
 /* ================= 권한 ================= */
 function requestPermission() {
@@ -94,6 +96,9 @@ function onMotion(e) {
   if (Math.abs(filtAX) > MOVE_THRESHOLD) vx += filtAX * MOVE_GAIN;
   if (Math.abs(filtAY) > MOVE_THRESHOLD) vy -= filtAY * MOVE_GAIN;
 
+  // ⭐ 흔든 세기 누적
+  shakePower += Math.abs(filtAX) + Math.abs(filtAY);
+
   triggerRoll();
 }
 
@@ -101,9 +106,16 @@ function onMotion(e) {
 function triggerRoll() {
   if (rolling) return;
   rolling = true;
+  shakePower = 0;
 
   clearTimeout(rollTimer);
-  rollTimer = setTimeout(showRandomCard, ROLL_DURATION);
+  rollTimer = setTimeout(() => {
+    rolling = false;
+
+    if (shakePower >= REQUIRED_SHAKE_POWER) {
+      showRandomCard();
+    }
+  }, ROLL_DURATION);
 }
 
 /* ================= 카드 랜덤 (가중치) ================= */
